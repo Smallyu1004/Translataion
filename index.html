@@ -229,7 +229,8 @@
         // 將 React 應用程式渲染到 DOM 中
         const container = document.getElementById('root');
         const root = ReactDOM.createRoot(container);
-        root.render(React.createElement(App, null)); // Use React.createElement for compatibility
+        // 使用 JSX 語法渲染 App 組件，因為 Babel 會處理它
+        root.render(<App />);
     </script>
 </body>
 </html>
