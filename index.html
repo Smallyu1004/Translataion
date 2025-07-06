@@ -55,15 +55,8 @@
               return;
             }
 
-            // API 金鑰。Canvas 環境會自動提供 __api_key。
-            // 如果您在 Canvas 以外的環境運行，或者 __api_key 未定義，您可能需要在此處手動填寫您的 API 金鑰。
-            const apiKey = typeof __api_key !== 'undefined' ? __api_key : "";
-
-            // 如果 apiKey 仍然是空的，表示 Canvas 沒有正確注入金鑰
-            if (!apiKey) {
-              setError('API 金鑰未提供。請確認您的 Canvas 環境已正確配置 API 金鑰，或聯繫支援以獲取更多協助。');
-              return;
-            }
+            // API 金鑰。在 Canvas 環境中，當設置為空字串時，系統會自動處理注入。
+            const apiKey = ""; 
 
             setIsLoading(true); // 設定載入狀態為 true
 
