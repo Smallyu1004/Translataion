@@ -1,0 +1,199 @@
+import React, { useState } from 'react';
+
+// 主應用程式組件
+const App = () => {
+  // 輸入文字的狀態
+  const [inputText, setInputText] = useState('');
+  // 翻譯結果的狀態
+  const [outputText, setOutputText] = useState('');
+  // 翻譯方向的狀態：'zh-en' (繁體中文到英文) 或 'en-zh' (英文到繁體中文)
+  const [direction, setDirection] = useState('zh-en');
+  // 載入狀態，用於顯示翻譯中的指示
+  const [isLoading, setIsLoading] = useState(false);
+  // 錯誤訊息的狀態
+  const [error, setError] = useState('');
+
+  // 處理翻譯邏輯的非同步函數
+  const handleTranslate = async () => {
+    // 清除之前的錯誤訊息和輸出
+    setError('');
+    setOutputText('');
+
+    // 如果輸入框為空，則不進行翻譯
+    if (!inputText.trim()) {
+      setError('請輸入要翻譯的文字。');
+      return;
+    }
+
+    setIsLoading(true); // 設定載入狀態為 true
+
+    try {
+      let prompt = '';
+      let schema = {}; // 用於結構化回應的 schema
+      let model = 'gemini-2.0-flash'; // 預設模型
+
+      // 根據翻譯方向設定提示和結構
+      if (direction === 'zh-en') {
+        // 繁體中文到英文：要求商業專業用語
+        prompt = `請將以下繁體中文文字翻譯成專業的商業英文。請確保翻譯內容符合商務溝通的慣例和專業術語：\n\n"${inputText}"`;
+        schema = {
+            type: "OBJECT",
+            properties: {
+                translatedText: { type: "STRING", description: "The professional business English translation." }
+            },
+            required: ["translatedText"]
+        };
+      } else {
+        // 英文到繁體中文：一般翻譯
+        prompt = `請將以下英文文字翻譯成繁體中文：\n\n"${inputText}"`;
+        schema = {
+            type: "OBJECT",
+            properties: {
+                translatedText: { type: "STRING", description: "The Traditional Chinese translation." }
+            },
+            required: ["translatedText"]
+        };
+      }
+
+      // 構建 API 請求的 payload
+      const chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+      const payload = {
+        contents: chatHistory,
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: schema
+        }
+      };
+
+      // API 金鑰，由 Canvas 環境提供
+      const apiKey = "";
+      // Gemini API 的 URL
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+      // 發送 API 請求
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      // 檢查回應是否成功
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`API 錯誤: ${response.status} - ${errorData.error?.message || '未知錯誤'}`);
+      }
+
+      const result = await response.json();
+
+      // 解析翻譯結果
+      if (result.candidates && result.candidates.length > 0 &&
+          result.candidates[0].content && result.candidates[0].content.parts &&
+          result.candidates[0].content.parts.length > 0) {
+        const jsonString = result.candidates[0].content.parts[0].text;
+        const parsedJson = JSON.parse(jsonString);
+        setOutputText(parsedJson.translatedText || '翻譯失敗，請重試。');
+      } else {
+        setError('翻譯服務無回應或回應格式不正確。');
+      }
+
+    } catch (err) {
+      console.error('翻譯錯誤:', err);
+      setError(`翻譯時發生錯誤：${err.message}。請檢查您的輸入並稍後重試。`);
+    } finally {
+      setIsLoading(false); // 無論成功或失敗，都將載入狀態設定為 false
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4 font-inter">
+      <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-4xl border border-gray-200">
+        <h1 className="text-3xl font-extrabold text-center text-gray-800 mb-8">繁英商務翻譯</h1>
+
+        {/* 語言方向切換按鈕 */}
+        <div className="flex justify-center space-x-4 mb-6">
+          <button
+            onClick={() => setDirection('zh-en')}
+            className={`px-6 py-3 rounded-full text-lg font-semibold transition-all duration-300 ease-in-out
+              ${direction === 'zh-en' ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-blue-100 hover:text-blue-700'}`}
+          >
+            繁體中文 → 英文 (商務)
+          </button>
+          <button
+            onClick={() => setDirection('en-zh')}
+            className={`px-6 py-3 rounded-full text-lg font-semibold transition-all duration-300 ease-in-out
+              ${direction === 'en-zh' ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-blue-100 hover:text-blue-700'}`}
+          >
+            英文 → 繁體中文
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          {/* 輸入文字區域 */}
+          <div>
+            <label htmlFor="inputText" className="block text-gray-700 text-sm font-bold mb-2">
+              {direction === 'zh-en' ? '輸入繁體中文' : '輸入英文'}
+            </label>
+            <textarea
+              id="inputText"
+              className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ease-in-out resize-y min-h-[150px] text-gray-800"
+              placeholder={direction === 'zh-en' ? '請輸入您想翻譯的繁體中文文字...' : 'Please enter the English text you want to translate...'}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+            ></textarea>
+          </div>
+
+          {/* 輸出文字區域 */}
+          <div>
+            <label htmlFor="outputText" className="block text-gray-700 text-sm font-bold mb-2">
+              {direction === 'zh-en' ? '英文翻譯 (商務)' : '繁體中文翻譯'}
+            </label>
+            <textarea
+              id="outputText"
+              className="w-full p-4 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 resize-y min-h-[150px] cursor-not-allowed"
+              readOnly
+              value={outputText}
+              placeholder="翻譯結果將顯示在這裡..."
+            ></textarea>
+          </div>
+        </div>
+
+        {/* 翻譯按鈕 */}
+        <div className="flex justify-center mb-4">
+          <button
+            onClick={handleTranslate}
+            className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out flex items-center justify-center
+                       disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                翻譯中...
+              </>
+            ) : (
+              '開始翻譯'
+            )}
+          </button>
+        </div>
+
+        {/* 錯誤訊息顯示 */}
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mt-4" role="alert">
+            <strong className="font-bold">錯誤！</strong>
+            <span className="block sm:inline ml-2">{error}</span>
+          </div>
+        )}
+
+        {/* 說明文字 */}
+        <p className="text-center text-gray-500 text-sm mt-6">
+          此翻譯工具旨在協助繁體中文與英文的互譯。中文翻譯英文時，會特別側重於生成專業的商業用語。
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default App;
